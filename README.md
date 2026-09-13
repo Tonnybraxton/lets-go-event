@@ -6,15 +6,15 @@ A Kenya-focused event discovery and ticketing platform built with Next.js, NestJ
 
 ### Event discovery
 
-![Let's Go Event homepage](docs/screenshots/homepage.svg)
+![Let's Go Event homepage](docs/screenshots/homepage.png)
 
 ### Explore events
 
-![Event search and discovery](docs/screenshots/explore.svg)
+![Event search and discovery](docs/screenshots/explore.png)
 
 ### Event details
 
-![Event details and ticket selection](docs/screenshots/event-details.svg)
+![Event details and ticket selection](docs/screenshots/event-details.png)
 
 Screenshots show the local development application and its sample catalogue.
 

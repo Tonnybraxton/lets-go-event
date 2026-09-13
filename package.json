@@ -1,0 +1,25 @@
+{
+  "name": "lets-go-event",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.4.0",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @letsgo/database generate",
+    "db:push": "pnpm --filter @letsgo/database db:push",
+    "db:migrate": "pnpm --filter @letsgo/database migrate",
+    "db:seed": "pnpm --filter @letsgo/database seed",
+    "dev:django": "apps\\django_admin\\.venv\\Scripts\\python.exe apps\\django_admin\\manage.py runserver 127.0.0.1:8000"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "2.10.9",
+    "typescript": "^5.9.3"
+  }
+}

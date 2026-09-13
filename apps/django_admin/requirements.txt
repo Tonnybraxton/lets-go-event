@@ -1,0 +1,9 @@
+Django==5.2.15
+Pillow==11.3.0
+psycopg[binary]==3.2.10
+celery==5.5.3
+redis==6.4.0
+Scrapy==2.13.3
+parsel==1.10.0
+dateparser==1.2.2
+rapidfuzz==3.14.1

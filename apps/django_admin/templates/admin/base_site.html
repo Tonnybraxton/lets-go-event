@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Let's Go Operations{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/letsgo-admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+  <div class="letsgo-brand">
+    <span class="letsgo-brand__mark">L</span>
+    <span><strong>LET'S GO</strong><small>Event Operations</small></span>
+  </div>
+{% endblock %}
+
+{% block nav-global %}
+  <a class="catalogue-link" href="/api/events/" target="_blank" rel="noreferrer">View published API</a>
+{% endblock %}

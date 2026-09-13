@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ORGANIZER_OWNER
+  ORGANIZER_MANAGER
+  EVENT_MANAGER
+  FINANCE_MANAGER
+  CHECKIN_STAFF
+  SUPPORT_AGENT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  POSTPONED
+  CANCELLED
+  COMPLETED
+}
+
+enum OrderStatus {
+  RESERVED
+  AWAITING_PAYMENT
+  PAYMENT_PROCESSING
+  PAID
+  FULFILLING
+  COMPLETED
+  PAYMENT_FAILED
+  EXPIRED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentStatus {
+  CREATED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  RECONCILIATION_REQUIRED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum TicketStatus {
+  ACTIVE
+  CHECKED_IN
+  TRANSFER_PENDING
+  TRANSFERRED
+  CANCELLED
+  REFUNDED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  RELEASED
+}
+
+enum DiscoveryLocationSource {
+  MANUAL_SEARCH
+  SAVED_LOCATION
+  OPTIONAL_GPS
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  passwordHash  String?
+  displayName   String
+  role          UserRole @default(CUSTOMER)
+  emailVerified DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  memberships   OrganizationMember[]
+  orders        Order[]
+  tickets       Ticket[]
+  favorites     Favorite[]
+  savedLocations SavedLocation[]
+  auditLogs     AuditLog[] @relation("AuditActor")
+}
+
+model Account {
+  id                String @id @default(uuid()) @db.Uuid
+  userId            String @db.Uuid
+  provider          String
+  providerAccountId String
+  createdAt         DateTime @default(now())
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String @id @default(uuid()) @db.Uuid
+  sessionToken String @unique
+  userId       String @db.Uuid
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Organization {
+  id          String @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String @unique
+  description String?
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  members     OrganizationMember[]
+  profile     OrganizerProfile?
+  events      Event[]
+}
+
+model OrganizationMember {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  userId         String @db.Uuid
+  role           UserRole
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model OrganizerProfile {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @db.Uuid
+  bio            String?
+  avatarUrl      String?
+  bannerUrl      String?
+  websiteUrl     String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Venue {
+  id          String @id @default(uuid()) @db.Uuid
+  slug        String @unique
+  name        String
+  address     String
+  area        String?
+  city        String
+  country     String
+  countryCode String @db.Char(2)
+  postalCode  String?
+  landmark    String?
+  latitude    Decimal @db.Decimal(10, 7)
+  longitude   Decimal @db.Decimal(10, 7)
+  timezone    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  events      Event[]
+  @@index([city])
+  @@index([latitude, longitude])
+}
+
+model Event {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  venueId        String @db.Uuid
+  slug           String @unique
+  title          String
+  summary        String
+  description    String
+  category       String
+  status         EventStatus @default(DRAFT)
+  startAt        DateTime
+  endAt          DateTime
+  timezone       String
+  currency       String @default("KES") @db.Char(3)
+  imageUrl       String?
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  venue          Venue @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  ticketTypes    TicketType[]
+  orders         Order[]
+  favorites      Favorite[]
+  images         EventImage[]
+  schedule       EventScheduleItem[]
+  artists        EventArtist[]
+  @@index([status, startAt])
+  @@index([category, startAt])
+  @@index([venueId])
+}
+
+model TicketType {
+  id             String @id @default(uuid()) @db.Uuid
+  eventId        String @db.Uuid
+  name           String
+  description    String?
+  priceMinor     Int
+  currency       String @db.Char(3)
+  capacity       Int
+  soldCount      Int @default(0)
+  reservedCount  Int @default(0)
+  salesStartAt   DateTime?
+  salesEndAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  event          Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reservations   InventoryReservation[]
+  orderItems     OrderItem[]
+  tickets        Ticket[]
+  @@unique([eventId, name])
+  @@index([eventId])
+}
+
+model InventoryReservation {
+  id           String @id @default(uuid()) @db.Uuid
+  ticketTypeId String @db.Uuid
+  orderId      String? @unique @db.Uuid
+  quantity     Int
+  status       ReservationStatus @default(ACTIVE)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  order        Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  @@index([ticketTypeId, status, expiresAt])
+}
+
+model Order {
+  id              String @id @default(uuid()) @db.Uuid
+  reference       String @unique
+  userId          String? @db.Uuid
+  eventId         String @db.Uuid
+  email           String
+  status          OrderStatus @default(RESERVED)
+  subtotalMinor   Int
+  feeMinor        Int
+  totalMinor      Int
+  currency        String @db.Char(3)
+  idempotencyKey  String @unique
+  reservationEndsAt DateTime
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event           Event @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  items           OrderItem[]
+  payments        Payment[]
+  tickets         Ticket[]
+  reservation     InventoryReservation?
+  @@index([userId, createdAt])
+  @@index([eventId, status])
+}
+
+model OrderItem {
+  id             String @id @default(uuid()) @db.Uuid
+  orderId        String @db.Uuid
+  ticketTypeId   String @db.Uuid
+  nameSnapshot   String
+  unitPriceMinor Int
+  quantity       Int
+  totalMinor     Int
+  order          Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  tickets        Ticket[]
+  @@index([orderId])
+}
+
+model Payment {
+  id                String @id @default(uuid()) @db.Uuid
+  orderId           String @db.Uuid
+  provider          String
+  status            PaymentStatus @default(CREATED)
+  amountMinor       Int
+  currency          String @db.Char(3)
+  providerReference String? @unique
+  checkoutRequestId String? @unique
+  idempotencyKey    String @unique
+  paidAt            DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  order             Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  attempts          PaymentAttempt[]
+  callbacks         PaymentCallback[]
+  @@index([orderId, status])
+}
+
+model PaymentAttempt {
+  id            String @id @default(uuid()) @db.Uuid
+  paymentId     String @db.Uuid
+  status        PaymentStatus
+  safeMetadata  Json?
+  createdAt     DateTime @default(now())
+  payment       Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId, createdAt])
+}
+
+model PaymentCallback {
+  id               String @id @default(uuid()) @db.Uuid
+  paymentId        String @db.Uuid
+  providerEventKey String @unique
+  resultCode       String?
+  payloadHash      String
+  receivedAt       DateTime @default(now())
+  processedAt      DateTime?
+  payment          Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId])
+}
+
+model Ticket {
+  id              String @id @default(uuid()) @db.Uuid
+  publicReference String @unique
+  orderId         String @db.Uuid
+  orderItemId     String @db.Uuid
+  ticketTypeId    String @db.Uuid
+  ownerId         String? @db.Uuid
+  attendeeName    String
+  attendeeEmail   String
+  status          TicketStatus @default(ACTIVE)
+  qrTokenHash     String @unique
+  pdfObjectKey    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  order           Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  ticketType      TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  owner           User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  checkIns        TicketCheckIn[]
+  transfers       TicketTransfer[]
+  @@index([ownerId, status])
+  @@index([orderId])
+}
+
+model TicketCheckIn {
+  id          String @id @default(uuid()) @db.Uuid
+  ticketId    String @db.Uuid
+  scannedById String? @db.Uuid
+  gate        String?
+  scannedAt   DateTime @default(now())
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  @@index([ticketId, scannedAt])
+}
+
+model TicketTransfer {
+  id             String @id @default(uuid()) @db.Uuid
+  ticketId       String @db.Uuid
+  recipientEmail String
+  tokenHash      String @unique
+  acceptedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  ticket         Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  @@index([ticketId])
+}
+
+model Favorite {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  eventId   String @db.Uuid
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  @@unique([userId, eventId])
+}
+
+model SavedLocation {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @db.Uuid
+  label      String
+  placeLabel String
+  city       String
+  country    String
+  latitude   Decimal @db.Decimal(10, 7)
+  longitude  Decimal @db.Decimal(10, 7)
+  source     DiscoveryLocationSource
+  createdAt  DateTime @default(now())
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Artist {
+  id        String @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String @unique
+  bio       String?
+  createdAt DateTime @default(now())
+  events    EventArtist[]
+}
+
+model EventArtist {
+  eventId  String @db.Uuid
+  artistId String @db.Uuid
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, artistId])
+  @@index([artistId])
+}
+
+model EventImage {
+  id        String @id @default(uuid()) @db.Uuid
+  eventId   String @db.Uuid
+  objectKey String
+  altText   String
+  sortOrder Int @default(0)
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, sortOrder])
+}
+
+model EventScheduleItem {
+  id       String @id @default(uuid()) @db.Uuid
+  eventId  String @db.Uuid
+  title    String
+  startsAt DateTime
+  endsAt   DateTime?
+  event    Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, startsAt])
+}
+
+model AuditLog {
+  id           String @id @default(uuid()) @db.Uuid
+  actorId      String? @db.Uuid
+  action       String
+  entityType   String
+  entityId     String
+  safeMetadata Json?
+  ipHash       String?
+  createdAt    DateTime @default(now())
+  actor        User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+}

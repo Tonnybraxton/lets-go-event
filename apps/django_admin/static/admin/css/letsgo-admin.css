@@ -1,0 +1,22 @@
+:root {
+  --primary: #7c3aed;
+  --secondary: #11131a;
+  --accent: #38d9ff;
+  --header-bg: #090a0f;
+  --header-color: #f8fafc;
+  --breadcrumbs-bg: #151822;
+  --link-fg: #6d28d9;
+  --link-hover-color: #4c1d95;
+}
+
+#header { background: var(--header-bg); padding-block: 12px; }
+#branding h1 { margin: 0; }
+.letsgo-brand { display: flex; align-items: center; gap: 11px; color: white; }
+.letsgo-brand__mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 0 25px #8b5cf666; font-weight: 900; }
+.letsgo-brand strong, .letsgo-brand small { display: block; }
+.letsgo-brand strong { letter-spacing: -.03em; }
+.letsgo-brand small { color: #a5a8b4; margin-top: 2px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.catalogue-link { color: #c4b5fd !important; font-weight: 700; }
+.module h2, .module caption, .inline-group h2 { background: #171923; }
+input[type=submit], input[type=button], .submit-row input, a.button { background: #7c3aed; border-radius: 999px; }
+.submit-row input.default { background: #5b21b6; }

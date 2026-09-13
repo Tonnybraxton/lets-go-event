@@ -1,0 +1,1 @@
+export default function Layout({children}:{children:React.ReactNode}){return <html lang="en"><body style={{margin:0,background:"#06070a",color:"#f7f7fb",fontFamily:"Inter,system-ui"}}>{children}</body></html>}

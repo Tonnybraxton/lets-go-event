@@ -1,0 +1,12 @@
+"use client";
+
+import { useState } from "react";
+
+export default function Page() {
+  const [code, setCode] = useState(""); const [result, setResult] = useState(""); const [checking, setChecking] = useState(false);
+  async function scan() {
+    setChecking(true); setResult("");
+    try { const response = await fetch("/api/scan", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})}); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "Ticket is invalid."); setResult(`Admit: ${payload.event} — ${payload.tier}. Checked in at ${new Date(payload.checkedInAt).toLocaleTimeString("en-KE")}.`); setCode(""); } catch (error) { setResult(error instanceof Error ? error.message : "Ticket is invalid."); } finally { setChecking(false); }
+  }
+  return <main style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:20}}><section style={{width:"min(420px,100%)",textAlign:"center"}}><p style={{color:"#a78bfa",fontWeight:900,letterSpacing:".15em",fontSize:12}}>DOOR MODE</p><h1 style={{fontSize:42,letterSpacing:"-.05em"}}>Validate tickets.</h1><div style={{aspectRatio:"1",border:"1px solid #353847",borderRadius:28,background:"radial-gradient(circle,#171b25,#0a0c11)",display:"grid",placeItems:"center",margin:"30px 0"}}><div style={{width:"68%",height:"68%",border:"3px solid #8b5cf6",borderRadius:20,boxShadow:"0 0 45px #8b5cf655",display:"grid",placeItems:"center",fontSize:54}}>✓</div></div><form onSubmit={(event) => { event.preventDefault(); void scan(); }}><label htmlFor="ticket-code" style={{display:"block",textAlign:"left",marginBottom:8}}>Ticket code</label><input id="ticket-code" value={code} onChange={(event)=>setCode(event.target.value)} placeholder="LGE-..." required style={{width:"100%",padding:14,borderRadius:10,border:"1px solid #353847",background:"#0a0c11",color:"white",marginBottom:12}}/><button type="button" onClick={() => void scan()} style={{width:"100%",border:0,borderRadius:999,padding:16,background:"#8b5cf6",color:"white",fontWeight:900}} disabled={checking}>{checking ? "Checking…" : "Validate ticket"}</button></form>{result && <p role="status" style={{color:"#c4b5fd",fontSize:14,lineHeight:1.6}}>{result}</p>}<p style={{color:"#8f93a2",fontSize:13,lineHeight:1.6}}>Use a camera scanner or enter the QR ticket code. Duplicate tickets are blocked server-side.</p></section></main>;
+}

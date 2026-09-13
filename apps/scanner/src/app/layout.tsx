@@ -1,0 +1,1 @@
+export const metadata={title:"Let's Go Scanner",manifest:"/manifest.webmanifest"}; export default function Layout({children}:{children:React.ReactNode}){return <html lang="en"><body style={{margin:0,background:"#050609",color:"white",fontFamily:"Inter,system-ui"}}>{children}</body></html>}

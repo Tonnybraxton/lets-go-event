@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const catalogue = await getAvailableEvents();
-  const featured = catalogue.find((event) => event.featured) ?? catalogue[0]!;
+  const featured = catalogue.find((event) => event.slug === "halloween-party-mombasa-2026")
+    ?? catalogue.find((event) => event.featured)
+    ?? catalogue[0]!;
   const featuredStart = new Date(featured.startAt);
   const featuredDate = featuredStart.toLocaleDateString("en-KE", {
     weekday: "short",

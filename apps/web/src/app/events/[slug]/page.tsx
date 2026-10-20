@@ -1,9 +1,10 @@
-import { BadgeCheck, CalendarDays, Clock3, MapPin, Share2 } from "lucide-react";
+import { BadgeCheck, CalendarDays, Clock3, MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { TicketPanel } from "@/components/ticket-panel";
 import { EventMap } from "@/components/event-map";
+import { EventActions } from "@/components/event-actions";
 import { events, getEvent } from "@/lib/data";
 
 export function generateStaticParams() {
@@ -27,7 +28,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
   return <>
     <section className="event-detail-hero">
-      <Image src={event.image} alt={`${event.title} event artwork`} fill priority sizes="100vw" />
+      <Image src={event.image} alt={`${event.title} event poster`} fill unoptimized priority sizes="100vw" />
       <div className="detail-title">
         <p className="eyebrow">{event.category} · {event.county ?? event.city}</p>
         <h1>{event.title}</h1>
@@ -44,16 +45,16 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         <h2>{event.summary}</h2>
         <p>{event.description}</p>
         {event.isExternalListing && <div className="info-item">
-          <small>Original ticket source</small>
+          <small>Original event source</small>
           <strong>{event.sourceName}</strong>
-          <p className="muted" style={{marginBottom:0}}>Confirm final details, availability and policies on the original listing before booking.</p>
+          <p className="muted" style={{marginBottom:0}}>Confirm the latest event details, availability and policies on the original listing.</p>
         </div>}
         <div className="info-list">
           <div className="info-item"><small>Hosted by</small><strong>{event.organizer} {event.organizerVerified && <BadgeCheck size={16} color="#8b5cf6" style={{display:"inline"}}/>}</strong></div>
           <div className="info-item"><small>Venue</small><strong>{event.venue}, {event.area}</strong></div>
           <div className="info-item"><small>Date & time</small><strong>{scheduleLabel}</strong></div>
-          <div className="info-item"><small>Share</small><strong><Share2 size={16} style={{display:"inline"}}/> Send to your people</strong></div>
         </div>
+        <EventActions event={event}/>
         <h2>Good to know</h2>
         <p>{event.isExternalListing ? "This event uses an external ticket source. The original source controls ticket availability, checkout and final event details." : "Doors open one hour before start. A valid secure digital ticket is required at entry."}</p>
         <h2>Location</h2>
@@ -68,3 +69,4 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
     </div>
   </>;
 }
+

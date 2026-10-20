@@ -32,7 +32,7 @@ export default async function HomePage() {
   const westlands = locations[0]!;
   const nearby = (await getNearbyEvents(westlands, 25)).slice(0, 6);
   const curated = catalogue.filter((event) => event.slug !== featured.slug).slice(0, 3);
-  const hotCounties = getHotCounties(catalogue).slice(0, 4);
+  const hotCounties = getHotCounties(catalogue).slice(0, 10);
 
   return <>
     <section className="hero">
@@ -97,7 +97,7 @@ export default async function HomePage() {
         </div>
         <div className="county-discovery-grid">
           {hotCounties.map((item, index) => <Link key={item.county} className="county-feature-card" href={`/explore?county=${encodeURIComponent(item.county)}`}>
-            <span className="county-feature-top"><span>0{index + 1} · COUNTY</span><ArrowUpRight size={18}/></span>
+            <span className="county-feature-top"><span>{String(index + 1).padStart(2, "0")} · COUNTY</span><ArrowUpRight size={18}/></span>
             <strong>{item.county}</strong>
             <span className="county-feature-meta">{item.eventCount} upcoming {item.eventCount === 1 ? "event" : "events"} · Next {new Date(item.nextStartAt).toLocaleDateString("en-KE", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Nairobi" })}</span>
           </Link>)}

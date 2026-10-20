@@ -164,7 +164,7 @@ export const events: EventListing[] = [
     tags: ["Halloween", "Gaming", "Esports"], ticketTiers: [], managedBy: "DEMO", sourceName: "Looped", sourceUrl: "https://looped.co.ke/unified-event/halloween-lan-party-1b7fe7f6", isExternalListing: true,
   },
   {
-    id: "mba_20261031_halloween-party", slug: "halloween-party-mombasa-2026", title: "Halloween Party", category: "Music", mood: "Costume night",
+    id: "mba_20261031_halloween-party", slug: "halloween-party-mombasa-2026", title: "Halloween Party", category: "Music", mood: "Costume night", featured: true,
     summary: "A Halloween celebration with music, themed décor and costume fun in Mombasa.", description: "Mombasa Events lists this party for Saturday, 31 October 2026, at 2:00 PM in Mombasa. Advance tickets are listed at KES 1,050. The listing does not confirm an end time or precise venue; check the ticket page before travelling.",
     image: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1600&q=85", startAt: "2026-10-31T14:00:00+03:00", endAt: "2026-10-31T23:59:00+03:00", timezone: "Africa/Nairobi",
     venue: "Mombasa (venue to be confirmed)", address: "Mombasa", area: "Mombasa", city: "Mombasa", county: "Mombasa", country: "Kenya", latitude: -4.0435, longitude: 39.6682,

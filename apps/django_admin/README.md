@@ -41,10 +41,10 @@ SQLite is used for local development. Set `DJANGO_USE_POSTGRES=true` and the `PO
 The checkout flow calls Daraja from Django using its REST API. Consumer credentials and the passkey stay on the Django server; the browser receives only the order/payment status. No third-party SDK package is required.
 
 1. Create/sign in to a [Safaricom Daraja account](https://developer.safaricom.co.ke/), create a sandbox app and enable the **M-PESA Express (Lipa na M-PESA Online)** product. Copy the app's Consumer Key and Consumer Secret. Use the sandbox shortcode and passkey supplied by Daraja.
-2. Set the `MPESA_*` variables from `apps/django_admin/.env.example` in the **Django process environment**. Django does not load `.env` files automatically. Do not expose these values with a `NEXT_PUBLIC_` prefix or commit real credentials.
+2. Copy `.env.example` to `.env` in `apps/django_admin/` and set the `MPESA_*` values there, or provide them through the Django process environment. Django loads this ignored local `.env` file at startup without overriding variables already set by the deployment. Do not expose these values with a `NEXT_PUBLIC_` prefix or commit real credentials.
 3. Set `MPESA_CALLBACK_URL` to a public HTTPS address that forwards to Django's `/api/payments/mpesa/callback/` endpoint. For local testing, expose port 8000 with a temporary HTTPS tunnel (for example, ngrok) and use that tunnel URL. Safaricom requires the callback to be reachable from the internet.
 4. For a PayBill, use `CustomerPayBillOnline` and set `MPESA_PARTY_B` to the PayBill shortcode. For a Till, set `MPESA_SHORTCODE` to the organization/HO shortcode, `MPESA_PARTY_B` to the Till number, and `MPESA_TRANSACTION_TYPE=CustomerBuyGoodsOnline`.
-5. Apply the order payment fields and start Django with those environment variables:
+5. Apply the order payment fields and start Django:
 
    ```powershell
    .venv\Scripts\python.exe manage.py migrate

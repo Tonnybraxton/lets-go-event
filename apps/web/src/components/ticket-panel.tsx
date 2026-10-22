@@ -5,15 +5,27 @@ import { LockKeyhole } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/data";
 
-export function TicketPanel({ tiers, externalUrl, priceAvailable = true }: { tiers: TicketTier[]; externalUrl?: string | undefined; priceAvailable?: boolean | undefined }) {
+export function TicketPanel({
+  tiers,
+  externalUrl,
+  priceAvailable = true,
+  sandboxOnly = false,
+  defaultPhoneNumber = "",
+}: {
+  tiers: TicketTier[];
+  externalUrl?: string | undefined;
+  priceAvailable?: boolean | undefined;
+  sandboxOnly?: boolean | undefined;
+  defaultPhoneNumber?: string | undefined;
+}) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber);
   const [pendingReference, setPendingReference] = useState("");
   const total = useMemo(() => tiers.reduce((sum, tier) => sum + tier.priceMinor * (quantities[tier.id] ?? 0), 0), [quantities, tiers]);
 
-  if (externalUrl || priceAvailable === false) return <aside className="ticket-panel"><span className="eyebrow">External listing</span><h2>Tickets at the source</h2><p className="muted">Availability and checkout are managed by the original event source.</p>{externalUrl ? <a className="button button-violet" style={{width:"100%",display:"block",textAlign:"center"}} href={externalUrl} target="_blank" rel="noopener noreferrer">View original listing</a> : <p className="trust">Source ticket details are coming soon.</p>}</aside>;
+  if ((externalUrl || priceAvailable === false) && tiers.length === 0) return <aside className="ticket-panel"><span className="eyebrow">External listing</span><h2>Tickets at the source</h2><p className="muted">Availability and checkout are managed by the original event source.</p>{externalUrl ? <a className="button button-violet" style={{width:"100%",display:"block",textAlign:"center"}} href={externalUrl} target="_blank" rel="noopener noreferrer">View original listing</a> : <p className="trust">Source ticket details are coming soon.</p>}</aside>;
 
   async function reserveTickets() {
     setSaving(true); setMessage("");
@@ -62,9 +74,9 @@ export function TicketPanel({ tiers, externalUrl, priceAvailable = true }: { tie
     finally { setSaving(false); }
   }
 
-  return <aside className="ticket-panel"><span className="eyebrow">Verified inventory</span><h2>Choose tickets</h2><p className="muted" style={{fontSize:13}}>Your selection is held for 10 minutes when you reserve it.</p>
+  return <aside className="ticket-panel"><span className="eyebrow">{sandboxOnly ? "Sandbox checkout" : "Verified inventory"}</span><h2>{sandboxOnly ? "Test checkout" : "Choose tickets"}</h2><p className="muted" style={{fontSize:13}}>{sandboxOnly ? "Sandbox only: this test tier does not issue an official event ticket or guarantee entry." : "Your selection is held for 10 minutes when you reserve it."}</p>
     {tiers.map((tier) => { const quantity = quantities[tier.id] ?? 0; const maximum = Math.min(6, tier.remaining); return <div className="ticket-option" key={tier.id}><div><strong>{tier.name}</strong><small className="muted" style={{display:"block",marginTop:4}}>{tier.description} · {tier.remaining} left</small><span style={{display:"block",marginTop:8}}>{formatMoney(tier.priceMinor,tier.currency)}</span></div><div style={{display:"flex",alignItems:"center",gap:6}}><button type="button" aria-label={`Decrease ${tier.name} quantity`} disabled={quantity === 0} onClick={() => setQuantities({...quantities,[tier.id]:quantity - 1})}>−</button><input aria-label={`${tier.name} quantity`} type="number" min="0" max={maximum} value={quantity} onChange={(event) => setQuantities({...quantities,[tier.id]:Math.max(0,Math.min(maximum,Number(event.target.value) || 0))})}/><button type="button" aria-label={`Increase ${tier.name} quantity`} disabled={quantity === maximum} onClick={() => setQuantities({...quantities,[tier.id]:quantity + 1})}>+</button></div></div>; })}
-    <div className="form-group" style={{marginTop:18}}><label htmlFor="mpesa-phone">M-PESA phone number</label><input id="mpesa-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="0712345678" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} required/><small className="muted">We’ll send a payment prompt to this number.</small></div>
-    <div className="ticket-total"><span>Total</span><strong>{formatMoney(total,tiers[0]?.currency)}</strong></div><button className="button button-violet" style={{width:"100%"}} disabled={total === 0 || saving || !phoneNumber.trim() || Boolean(pendingReference)} onClick={reserveTickets}>{saving ? "Waiting for M-PESA…" : pendingReference ? "Payment pending" : "Pay with M-PESA"}</button>{pendingReference && !saving && <button className="button button-ghost" style={{width:"100%",marginTop:10}} onClick={checkPaymentStatus}>Check payment status</button>}{message && <p className="trust" role="status">{message}</p>}<p className="trust"><LockKeyhole size={13}/> Your M-PESA PIN is entered only on your phone.</p></aside>;
+    <div className="form-group" style={{marginTop:18}}><label htmlFor="mpesa-phone">{sandboxOnly ? "Sandbox prompt phone" : "M-PESA phone number"}</label><input id="mpesa-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="0712345678" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} required/><small className="muted">{sandboxOnly ? "The prompt goes to the phone above; sandbox payment collection is handled by the configured shortcode." : "We’ll send a payment prompt to this number."}</small></div>
+    <div className="ticket-total"><span>Total</span><strong>{formatMoney(total,tiers[0]?.currency)}</strong></div><button className="button button-violet" style={{width:"100%"}} disabled={total === 0 || saving || !phoneNumber.trim() || Boolean(pendingReference)} onClick={reserveTickets}>{saving ? "Waiting for M-PESA…" : pendingReference ? "Payment pending" : sandboxOnly ? "Send sandbox STK prompt" : "Pay with M-PESA"}</button>{pendingReference && !saving && <button className="button button-ghost" style={{width:"100%",marginTop:10}} onClick={checkPaymentStatus}>Check payment status</button>}{message && <p className="trust" role="status">{message}</p>}<p className="trust"><LockKeyhole size={13}/> Your M-PESA PIN is entered only on your phone.</p></aside>;
 }
 

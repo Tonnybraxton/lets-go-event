@@ -233,7 +233,17 @@ export async function getAvailableEvents(): Promise<EventListing[]> {
     const merged = new Map<string, EventListing>(
       events.map((event) => [event.slug, { ...event, managedBy: "DEMO" as const }]),
     );
-    for (const event of payload.items) merged.set(event.slug, { ...event, managedBy: "DJANGO" });
+    for (const event of payload.items) {
+      const demoEvent = merged.get(event.slug);
+      merged.set(event.slug, {
+        ...demoEvent,
+        ...event,
+        managedBy: "DJANGO",
+        sourceName: event.sourceName || demoEvent?.sourceName || "",
+        sourceUrl: event.sourceUrl || demoEvent?.sourceUrl || "",
+        isExternalListing: demoEvent?.isExternalListing ?? event.isExternalListing ?? false,
+      });
+    }
     return upcomingEvents([...merged.values()]);
   } catch {
     return upcomingEvents(events);
@@ -312,7 +322,15 @@ export async function getEvent(slug: string) {
       headers: { Accept: "application/json" },
     });
     if (response.ok) {
-      const publishedEvent = { ...((await response.json()) as EventListing), managedBy: "DJANGO" as const };
+      const apiEvent = (await response.json()) as EventListing;
+      const publishedEvent = {
+        ...demoEvent,
+        ...apiEvent,
+        managedBy: "DJANGO" as const,
+        sourceName: apiEvent.sourceName || demoEvent?.sourceName || "",
+        sourceUrl: apiEvent.sourceUrl || demoEvent?.sourceUrl || "",
+        isExternalListing: demoEvent?.isExternalListing ?? apiEvent.isExternalListing ?? false,
+      };
       return Date.parse(publishedEvent.endAt) > Date.now() ? publishedEvent : undefined;
     }
   } catch {

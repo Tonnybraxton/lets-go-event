@@ -3,12 +3,20 @@ from django.db import models
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import Event, Order, Organizer, Ticket, TicketTier, Venue
+from .models import Event, LocationSuggestion, Order, Organizer, Ticket, TicketTier, Venue
 
 
 admin.site.site_header = "Let's Go Event Operations"
 admin.site.site_title = "Let's Go Admin"
 admin.site.index_title = "Event catalogue and publishing"
+
+
+@admin.register(LocationSuggestion)
+class LocationSuggestionAdmin(admin.ModelAdmin):
+    list_display = ("county", "area", "event_type", "timing", "created_at")
+    list_filter = ("county", "event_type", "timing", "created_at")
+    search_fields = ("county", "area", "event_type", "note")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(Organizer)
@@ -123,10 +131,10 @@ class TicketTierAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("reference", "event", "status", "total", "reservation_expires_at", "created_at")
-    list_filter = ("status", "currency")
+    list_display = ("reference", "event", "status", "payment_status", "total", "reservation_expires_at", "created_at")
+    list_filter = ("status", "payment_status", "currency")
     search_fields = ("reference", "event__title")
-    readonly_fields = ("reference", "total_minor", "currency", "reservation_expires_at", "created_at", "updated_at")
+    readonly_fields = ("reference", "total_minor", "currency", "reservation_expires_at", "phone_number", "payment_status", "checkout_request_id", "merchant_request_id", "mpesa_receipt_number", "payment_result_desc", "created_at", "updated_at")
     actions = ("mark_paid_and_issue_tickets",)
 
     @admin.display(description="Total")
@@ -145,7 +153,8 @@ class OrderAdmin(admin.ModelAdmin):
                 Ticket.objects.bulk_create([Ticket(order=order, tier=item.tier) for _ in range(item.quantity)])
                 issued += item.quantity
             order.status = Order.Status.PAID
-            order.save(update_fields=["status", "updated_at"])
+            order.payment_status = Order.PaymentStatus.COMPLETED
+            order.save(update_fields=["status", "payment_status", "updated_at"])
         self.message_user(request, f"Issued {issued} ticket(s).", messages.SUCCESS)
 
 
@@ -158,3 +167,4 @@ class TicketAdmin(admin.ModelAdmin):
     @admin.display(description="Event")
     def event(self, ticket: Ticket) -> str:
         return ticket.order.event.title
+

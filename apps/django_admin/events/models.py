@@ -202,6 +202,12 @@ class Order(models.Model):
         EXPIRED = "EXPIRED", "Expired"
         CANCELLED = "CANCELLED", "Cancelled"
 
+    class PaymentStatus(models.TextChoices):
+        NOT_STARTED = "NOT_STARTED", "Not started"
+        PENDING = "PENDING", "Pending"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference = models.CharField(max_length=32, unique=True, editable=False)
     event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="orders")
@@ -209,6 +215,12 @@ class Order(models.Model):
     total_minor = models.PositiveBigIntegerField()
     currency = models.CharField(max_length=3, default="KES")
     reservation_expires_at = models.DateTimeField()
+    phone_number = models.CharField(max_length=12, blank=True)
+    payment_status = models.CharField(max_length=16, choices=PaymentStatus.choices, default=PaymentStatus.NOT_STARTED)
+    checkout_request_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    merchant_request_id = models.CharField(max_length=100, blank=True)
+    mpesa_receipt_number = models.CharField(max_length=32, blank=True)
+    payment_result_desc = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -249,3 +261,21 @@ class Ticket(models.Model):
         if not self.code:
             self.code = f"LGE-{uuid.uuid4().hex[:12].upper()}"
         super().save(*args, **kwargs)
+
+
+class LocationSuggestion(models.Model):
+    county = models.CharField(max_length=100)
+    area = models.CharField(max_length=100)
+    event_type = models.CharField(max_length=100)
+    timing = models.CharField(max_length=50)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "location suggestion"
+        verbose_name_plural = "location suggestions"
+
+    def __str__(self) -> str:
+        return f"{self.area}, {self.county} — {self.event_type}"
+

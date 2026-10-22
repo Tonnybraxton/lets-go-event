@@ -56,7 +56,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         </div>
         <EventActions event={event}/>
         <h2>Good to know</h2>
-        <p>{event.isExternalListing ? "This event uses an external ticket source. The original source controls ticket availability, checkout and final event details." : "Doors open one hour before start. A valid secure digital ticket is required at entry."}</p>
+        <p>{event.isExternalListing && event.ticketTiers.length > 0 ? "This event is listed by an external source. The checkout below is a sandbox test tier only; confirm official ticket availability and entry with the organizer." : event.isExternalListing ? "This event uses an external ticket source. The original source controls ticket availability, checkout and final event details." : "Doors open one hour before start. A valid secure digital ticket is required at entry."}</p>
         <h2>Location</h2>
         <div className="info-item">
           <small>Selected event venue—not your live position</small>
@@ -65,7 +65,13 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         </div>
         <EventMap events={[event]} mode="venue" compact title={`${event.venue}, ${event.city}`}/>
       </article>
-      <TicketPanel tiers={event.ticketTiers} externalUrl={event.isExternalListing ? event.sourceUrl : undefined} priceAvailable={event.priceAvailable}/>
+      <TicketPanel
+        tiers={event.ticketTiers}
+        externalUrl={event.isExternalListing && event.ticketTiers.length === 0 ? event.sourceUrl : undefined}
+        priceAvailable={event.priceAvailable}
+        sandboxOnly={event.slug === "aurix-shutdown"}
+        defaultPhoneNumber={event.slug === "aurix-shutdown" ? "0791677818" : undefined}
+      />
     </div>
   </>;
 }

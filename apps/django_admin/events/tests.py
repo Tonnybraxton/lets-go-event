@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -83,15 +84,26 @@ class PublishedEventApiTests(TestCase):
         response = self.client.get(reverse("admin:events_event_add"))
         self.assertEqual(response.status_code, 200)
 
-    def test_ticket_reservation_updates_inventory(self):
+    @patch("events.views.initiate_stk_push")
+    def test_ticket_reservation_updates_inventory(self, initiate_stk_push):
         tier = self.event.ticket_tiers.get()
+        initiate_stk_push.return_value = {
+            "CheckoutRequestID": "ws_CO_TEST_CHECKOUT",
+            "MerchantRequestID": "test-merchant-request",
+            "CustomerMessage": "STK Push sent.",
+        }
         response = self.client.post(
             reverse("events:order-create"),
-            data=json.dumps({"items": [{"tierId": str(tier.id), "quantity": 2}]}),
+            data=json.dumps({
+                "phoneNumber": "0712345678",
+                "items": [{"tierId": str(tier.id), "quantity": 2}],
+            }),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["status"], Order.Status.RESERVED)
+        self.assertEqual(response.json()["paymentStatus"], Order.PaymentStatus.PENDING)
+        initiate_stk_push.assert_called_once()
         tier.refresh_from_db()
         self.assertEqual(tier.reserved_count, 2)
 
@@ -111,3 +123,4 @@ class PublishedEventApiTests(TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertTrue(first.json()["valid"])
         self.assertEqual(second.status_code, 409)
+

@@ -1,5 +1,7 @@
 import json
+import re
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.db.models import F, Prefetch
@@ -9,7 +11,8 @@ from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Event, Order, OrderItem, Organizer, Ticket, TicketTier, Venue
+from .models import Event, LocationSuggestion, Order, OrderItem, Organizer, Ticket, TicketTier, Venue
+from .daraja import DarajaError, initiate_stk_push, query_stk_push
 
 
 def _payload(request):
@@ -27,6 +30,15 @@ def _image_url(request, event: Event) -> str:
     if event.cover_image:
         return request.build_absolute_uri(event.cover_image.url)
     return event.external_image_url
+
+
+def _normalize_mpesa_phone(value) -> str | None:
+    digits = re.sub(r"\D", "", str(value or ""))
+    if digits.startswith("0") and len(digits) == 10:
+        digits = "254" + digits[1:]
+    elif digits.startswith("7") or digits.startswith("1"):
+        digits = "254" + digits
+    return digits if re.fullmatch(r"254[17]\d{8}", digits) else None
 
 
 def _serialize_event(request, event: Event) -> dict:
@@ -172,10 +184,30 @@ def create_event_draft(request):
 
 @csrf_exempt
 @require_POST
+def create_location_suggestion(request):
+    payload = _payload(request)
+    required = ("county", "area", "eventType", "timing")
+    if not isinstance(payload, dict) or any(not str(payload.get(field, "")).strip() for field in required):
+        return _error("Please choose a county, area, event type and preferred time.")
+    suggestion = LocationSuggestion.objects.create(
+        county=str(payload["county"]).strip()[:100],
+        area=str(payload["area"]).strip()[:100],
+        event_type=str(payload["eventType"]).strip()[:100],
+        timing=str(payload["timing"]).strip()[:50],
+        note=str(payload.get("note", "")).strip()[:2000],
+    )
+    return JsonResponse({"id": suggestion.pk, "message": "Suggestion saved for the Let's Go team."}, status=201)
+
+
+@csrf_exempt
+@require_POST
 def create_order(request):
     payload = _payload(request)
     if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
         return _error("A ticket selection is required.")
+    phone_number = _normalize_mpesa_phone(payload.get("phoneNumber"))
+    if not phone_number:
+        return _error("Enter a valid Kenyan M-PESA number, such as 0712345678.")
     requested = {}
     for item in payload["items"]:
         try:
@@ -197,12 +229,121 @@ def create_order(request):
         for tier in tiers:
             if tier.remaining < requested[str(tier.id)]:
                 return _error(f"{tier.name} no longer has enough availability.", 409)
-        order = Order.objects.create(event=tiers[0].event, total_minor=sum(tier.price_minor * requested[str(tier.id)] for tier in tiers), currency=tiers[0].currency, reservation_expires_at=timezone.now() + timedelta(minutes=10))
+        order = Order.objects.create(event=tiers[0].event, total_minor=sum(tier.price_minor * requested[str(tier.id)] for tier in tiers), currency=tiers[0].currency, reservation_expires_at=timezone.now() + timedelta(minutes=10), phone_number=phone_number)
         for tier in tiers:
             quantity = requested[str(tier.id)]
             TicketTier.objects.filter(pk=tier.pk).update(reserved_count=F("reserved_count") + quantity)
             OrderItem.objects.create(order=order, tier=tier, quantity=quantity, unit_price_minor=tier.price_minor)
-    return JsonResponse({"reference": order.reference, "status": order.status, "expiresAt": order.reservation_expires_at.isoformat(), "totalMinor": order.total_minor, "currency": order.currency, "message": "Tickets are reserved for 10 minutes. Payment configuration is not enabled yet."}, status=201)
+    try:
+        mpesa_response = initiate_stk_push(order, phone_number)
+    except DarajaError as error:
+        with transaction.atomic():
+            failed_order = Order.objects.select_for_update().get(pk=order.pk)
+            if failed_order.status == Order.Status.RESERVED:
+                for item in failed_order.items.select_related("tier"):
+                    TicketTier.objects.filter(pk=item.tier_id).update(reserved_count=F("reserved_count") - item.quantity)
+                failed_order.status = Order.Status.CANCELLED
+                failed_order.payment_status = Order.PaymentStatus.FAILED
+                failed_order.payment_result_desc = str(error)[:255]
+                failed_order.save(update_fields=["status", "payment_status", "payment_result_desc", "updated_at"])
+        return _error(str(error), 503)
+
+    order.payment_status = Order.PaymentStatus.PENDING
+    order.checkout_request_id = str(mpesa_response["CheckoutRequestID"])
+    order.merchant_request_id = str(mpesa_response.get("MerchantRequestID", ""))[:100]
+    order.payment_result_desc = str(mpesa_response.get("CustomerMessage") or "STK Push sent. Enter your M-PESA PIN to complete payment.")[:255]
+    order.save(update_fields=["payment_status", "checkout_request_id", "merchant_request_id", "payment_result_desc", "updated_at"])
+    return JsonResponse({"reference": order.reference, "status": order.status, "paymentStatus": order.payment_status, "expiresAt": order.reservation_expires_at.isoformat(), "totalMinor": order.total_minor, "currency": order.currency, "message": order.payment_result_desc}, status=201)
+
+
+@csrf_exempt
+@require_POST
+def mpesa_callback(request):
+    payload = _payload(request)
+    body = payload.get("Body") if isinstance(payload, dict) else None
+    callback = body.get("stkCallback") if isinstance(body, dict) else None
+    if not isinstance(callback, dict) or not callback.get("CheckoutRequestID"):
+        return _error("Invalid M-PESA callback.")
+
+    checkout_id = str(callback["CheckoutRequestID"])
+    try:
+        result_code = int(callback.get("ResultCode"))
+    except (TypeError, ValueError):
+        return _error("Invalid M-PESA callback result.")
+
+    candidate = Order.objects.filter(checkout_request_id=checkout_id).only(
+        "merchant_request_id", "status", "payment_status",
+    ).first()
+    if candidate is None:
+        return _error("Order not found for this M-PESA checkout.", 404)
+    if candidate.merchant_request_id and str(callback.get("MerchantRequestID", "")) != candidate.merchant_request_id:
+        return _error("M-PESA request identifiers do not match.", 400)
+    if candidate.status != Order.Status.RESERVED or candidate.payment_status != Order.PaymentStatus.PENDING:
+        return JsonResponse({"ResultCode": 0, "ResultDesc": "Callback already processed."})
+
+    if result_code == 0:
+        try:
+            daraja_status = query_stk_push(checkout_id)
+        except DarajaError as error:
+            return _error(str(error), 503)
+        if str(daraja_status.get("ResponseCode", "")) != "0" or str(daraja_status.get("ResultCode", "")) != "0":
+            return _error("Daraja has not confirmed this payment yet.", 409)
+
+    with transaction.atomic():
+        try:
+            order = Order.objects.select_for_update().prefetch_related("items").get(checkout_request_id=checkout_id)
+        except Order.DoesNotExist:
+            return _error("Order not found for this M-PESA checkout.", 404)
+        if order.status != Order.Status.RESERVED or order.payment_status != Order.PaymentStatus.PENDING:
+            return JsonResponse({"ResultCode": 0, "ResultDesc": "Callback already processed."})
+        if order.merchant_request_id and str(callback.get("MerchantRequestID", "")) != order.merchant_request_id:
+            return _error("M-PESA request identifiers do not match.", 400)
+
+        if result_code == 0:
+            metadata = callback.get("CallbackMetadata", {}).get("Item", [])
+            values = {str(item.get("Name")): item.get("Value") for item in metadata if isinstance(item, dict)}
+            try:
+                paid_minor = int((Decimal(str(values["Amount"])) * 100).quantize(Decimal("1")))
+            except (KeyError, InvalidOperation, TypeError, ValueError):
+                return _error("Successful M-PESA callback is missing its amount.")
+            callback_phone = _normalize_mpesa_phone(values.get("PhoneNumber"))
+            receipt = str(values.get("MpesaReceiptNumber") or "").strip()
+            if paid_minor != order.total_minor or callback_phone != order.phone_number or not receipt:
+                return _error("M-PESA payment details did not match the reserved order.")
+
+            for item in order.items.select_related("tier"):
+                TicketTier.objects.filter(pk=item.tier_id).update(
+                    reserved_count=F("reserved_count") - item.quantity,
+                    sold_count=F("sold_count") + item.quantity,
+                )
+                Ticket.objects.bulk_create([Ticket(order=order, tier=item.tier) for _ in range(item.quantity)])
+            order.status = Order.Status.PAID
+            order.payment_status = Order.PaymentStatus.COMPLETED
+            order.mpesa_receipt_number = receipt[:32]
+        else:
+            for item in order.items.all():
+                TicketTier.objects.filter(pk=item.tier_id).update(reserved_count=F("reserved_count") - item.quantity)
+            order.status = Order.Status.CANCELLED
+            order.payment_status = Order.PaymentStatus.FAILED
+
+        order.payment_result_desc = str(callback.get("ResultDesc", ""))[:255]
+        order.save(update_fields=["status", "payment_status", "mpesa_receipt_number", "payment_result_desc", "updated_at"])
+    return JsonResponse({"ResultCode": 0, "ResultDesc": "Callback processed."})
+
+
+@require_GET
+def order_status(request, reference: str):
+    try:
+        order = Order.objects.get(reference=reference)
+    except Order.DoesNotExist as exc:
+        raise Http404("Order not found") from exc
+    return JsonResponse({
+        "reference": order.reference,
+        "status": order.status,
+        "paymentStatus": order.payment_status,
+        "message": order.payment_result_desc,
+        "receipt": order.mpesa_receipt_number,
+    })
 
 
 @csrf_exempt
@@ -224,3 +365,4 @@ def scan_ticket(request):
         ticket.checked_in_at = timezone.now()
         ticket.save(update_fields=["checked_in_at"])
     return JsonResponse({"valid": True, "ticket": ticket.code, "event": ticket.order.event.title, "tier": ticket.tier.name, "checkedInAt": ticket.checked_in_at.isoformat()})
+

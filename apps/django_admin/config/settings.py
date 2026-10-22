@@ -3,6 +3,24 @@ from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def load_local_environment() -> None:
+    """Load the ignored Django .env file without overriding deployment variables."""
+    local_env = BASE_DIR / ".env"
+    if not local_env.is_file():
+        return
+    for raw_line in local_env.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name, value = name.strip(), value.strip()
+        if name:
+            os.environ.setdefault(name, value.strip("\"'"))
+
+
+load_local_environment()
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -108,3 +126,4 @@ RADAR_USER_AGENT = os.getenv(
     "RADAR_USER_AGENT",
     "LetsGoRadar/1.0 (+https://letsgo.example/radar-contact)",
 )
+

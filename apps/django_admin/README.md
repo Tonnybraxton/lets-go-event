@@ -51,6 +51,14 @@ The checkout flow calls Daraja from Django using its REST API. Consumer credenti
    .venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
    ```
 
+For the local AURIX SHUTDOWN sandbox demo, keep `MPESA_ENV=sandbox` and run
+`.venv\Scripts\python.exe manage.py enable_aurix_sandbox_checkout`. This creates
+a clearly labeled KES 400 test tier and refuses to run when `MPESA_ENV=production`.
+The sandbox prompt defaults to `0791677818`; it is the phone receiving the sandbox
+prompt, while test payment collection goes to the configured sandbox shortcode.
+This demo tier is not an official event ticket and does not represent confirmed
+organizer inventory.
+
 6. Publish an event with at least one available KES ticket tier, select tickets on its page, enter a Kenyan M-PESA number, and choose **Pay with M-PESA**. Daraja sends the STK prompt; its callback updates the order, confirms a successful payment against Daraja, and issues tickets. The browser polls the order status while the callback is processed.
 7. Before going live, complete Daraja's Go Live process, use the production app credentials and passkey, set `MPESA_ENV=production`, register the production shortcode/product, and use a stable HTTPS callback URL. Test the full callback and ticket-issuance flow in sandbox first.
 
